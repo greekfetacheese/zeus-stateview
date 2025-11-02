@@ -2,10 +2,10 @@
 pragma solidity >=0.7.0 <0.9.0;
 
 import {Test} from "forge-std/Test.sol";
-import {ZeusStateView} from "../src/ZeusStateView.sol";
+import {ZeusStateViewV2} from "../src/ZeusStateViewV2.sol";
 
-contract ZeusStateViewTest is Test {
-    ZeusStateView zeusStateView;
+contract ZeusStateViewV2Test is Test {
+    ZeusStateViewV2 zeusStateView;
     address Alice;
     uint256 AliceKey;
 
@@ -19,17 +19,25 @@ contract ZeusStateViewTest is Test {
 
     // Pools
     address public constant V2_USDC_DAI = 0xAE461cA67B15dc8dc81CE7615e0320dA1A9aB8D5;
+    address public constant V2_USDC_WETH = 0xB4e16d0168e52d35CaCD2c6185b44281Ec28C9Dc;
+
     address public constant V3_USDC_WETH = 0x88e6A0c2dDD26FEEb64F039a2c41296FcB3f5640;
     address public constant V3_USDC_WETH_MEDIUM = 0x8ad599c3A0ff1De082011EFDDc58f1908eb6e6D8;
     address public constant V3_USDT_UNI = 0x3470447f3CecfFAc709D3e783A307790b0208d60;
 
-    bytes32 public constant LINK_USDC =
+    bytes32 public constant V4_LINK_USDC =
         bytes32(uint256(0x50ae33c238824aa1937d5d9f1766c487bca39b548f8d957994e8357eeeca));
-    bytes32 public constant USDC_USDT =
-        bytes32(uint256(0x8aa4e11cbdf30eedc92100f4c8a31ff748e201d44712cc8c90d189edaa8e));
-    bytes32 public constant ETH_USDT = bytes32(uint256(0x50b00c1a5a8e582ec808e97e71598cd135206a9f9c548eab2ed73659e7ee));
-    bytes32 public constant ETH_UNI = bytes32(uint256(0x053f6a47ccba79e7d5d623173ed6dd5a31cf19c28bae0fb8276f4506295f));
 
+    bytes32 public constant V4_USDC_USDT =
+        bytes32(uint256(0x8aa4e11cbdf30eedc92100f4c8a31ff748e201d44712cc8c90d189edaa8e));
+
+    bytes32 public constant V4_ETH_USDT =
+        bytes32(uint256(0x50b00c1a5a8e582ec808e97e71598cd135206a9f9c548eab2ed73659e7ee));
+
+    bytes32 public constant V4_ETH_UNI =
+        bytes32(uint256(0x053f6a47ccba79e7d5d623173ed6dd5a31cf19c28bae0fb8276f4506295f));
+
+    address public constant UNISWAP_V2_FACTORY = 0x5C69bEe701ef814a2B6a3EDD4B1652CB9cc5aA6f;
     address public constant UNISWAP_V3_FACTORY = 0x1F98431c8aD98523631AE4a59f267346ea31F984;
     address public constant STATE_VIEW = 0x7fFE42C4a5DEeA5b0feC41C94C136Cf115597227;
 
@@ -37,7 +45,7 @@ contract ZeusStateViewTest is Test {
     uint256 public WETH_AMOUNT = 10e18;
 
     function setUp() public {
-        zeusStateView = new ZeusStateView();
+        zeusStateView = new ZeusStateViewV2();
         (address aliceAddr, uint256 aliceKey) = makeAddrAndKey("Alice");
         Alice = address(aliceAddr);
         AliceKey = aliceKey;
@@ -49,7 +57,7 @@ contract ZeusStateViewTest is Test {
         address[] memory owners = new address[](1);
         owners[0] = Alice;
 
-        ZeusStateView.ETHBalance[] memory balance = zeusStateView.getETHBalance(owners);
+        ZeusStateViewV2.ETHBalance[] memory balance = zeusStateView.getETHBalance(owners);
 
         for (uint256 i = 0; i < balance.length; i++) {
             assertEq(balance[i].owner, Alice);
@@ -61,7 +69,7 @@ contract ZeusStateViewTest is Test {
         address[] memory tokens = new address[](1);
         tokens[0] = WETH;
 
-        ZeusStateView.ERC20Balance[] memory balance = zeusStateView.getERC20Balance(tokens, Alice);
+        ZeusStateViewV2.ERC20Balance[] memory balance = zeusStateView.getERC20Balance(tokens, Alice);
 
         for (uint256 i = 0; i < balance.length; i++) {
             assertEq(balance[i].token, tokens[i]);
@@ -70,7 +78,7 @@ contract ZeusStateViewTest is Test {
     }
 
     function testGetERC20Info() public view {
-        ZeusStateView.ERC20Info memory info = zeusStateView.getERC20Info(WETH);
+        ZeusStateViewV2.ERC20Info memory info = zeusStateView.getERC20Info(WETH);
 
         assertEq(info.addr, WETH);
         assertEq(info.symbol, "WETH");
@@ -83,7 +91,7 @@ contract ZeusStateViewTest is Test {
         tokens[0] = WETH;
         tokens[1] = UNI;
 
-        ZeusStateView.ERC20Info[] memory info = zeusStateView.getERC20InfoBatch(tokens);
+        ZeusStateViewV2.ERC20Info[] memory info = zeusStateView.getERC20InfoBatch(tokens);
 
         assertEq(info[0].addr, WETH);
         assertEq(info[0].symbol, "WETH");
@@ -97,54 +105,66 @@ contract ZeusStateViewTest is Test {
     }
 
     function testGetV3Pools() public view {
-        ZeusStateView.V3Pool[] memory pools = zeusStateView.getV3Pools(UNISWAP_V3_FACTORY, USDC, WETH);
+        ZeusStateViewV2.V3Pool[] memory pools = zeusStateView.getV3Pools(UNISWAP_V3_FACTORY, USDC, WETH);
         assertEq(pools.length, 4);
+    }
+
+    function testGetPools() public view {
+        bytes32[] memory v4pools = new bytes32[](4);
+        v4pools[0] = V4_LINK_USDC;
+        v4pools[1] = V4_USDC_USDT;
+        v4pools[2] = V4_ETH_USDT;
+        v4pools[3] = V4_ETH_UNI;
+
+        address[] memory baseTokens = new address[](4);
+        baseTokens[0] = USDC;
+        baseTokens[1] = USDT;
+        baseTokens[2] = WETH;
+        baseTokens[3] = DAI;
+
+        ZeusStateViewV2.Pools memory pools = zeusStateView.getPools(
+            UNISWAP_V2_FACTORY,
+            UNISWAP_V3_FACTORY,
+            STATE_VIEW,
+            v4pools,
+            baseTokens,
+            UNI
+        );
+        
+        assertEq(pools.v2Pools.length, 4);
+        assertEq(pools.v3Pools.length, 4);
+        assertEq(pools.v4Pools.length, 4);
     }
 
     function testValidateV4Pools() public view {
         bytes32[] memory pools = new bytes32[](4);
-        pools[0] = LINK_USDC;
-        pools[1] = USDC_USDT;
-        pools[2] = ETH_USDT;
-        pools[3] = ETH_UNI;
+        pools[0] = V4_LINK_USDC;
+        pools[1] = V4_USDC_USDT;
+        pools[2] = V4_ETH_USDT;
+        pools[3] = V4_ETH_UNI;
 
         bytes32[] memory validPools = zeusStateView.validateV4Pools(STATE_VIEW, pools);
 
         assertEq(validPools.length, 4);
     }
 
-    function testGetV2Reserves() public view {
-        address[] memory pools = new address[](1);
-        pools[0] = V2_USDC_DAI;
+    function testGetPoolsState() public view {
+        address[] memory v2pools = new address[](2);
+        v2pools[0] = V2_USDC_DAI;
+        v2pools[1] = V2_USDC_WETH;
 
-        ZeusStateView.V2PoolReserves[] memory reserves = zeusStateView.getV2Reserves(pools);
+        ZeusStateViewV2.V3Pool[] memory v3pools = new ZeusStateViewV2.V3Pool[](2);
+        v3pools[0] = ZeusStateViewV2.V3Pool({addr: V3_USDC_WETH_MEDIUM, tokenA: USDC, tokenB: WETH, fee: 3000});
+        v3pools[1] = ZeusStateViewV2.V3Pool({addr: V3_USDT_UNI, tokenA: USDT, tokenB: UNI, fee: 3000});
 
-        assertEq(reserves.length, 1);
-        assertEq(reserves[0].pool, V2_USDC_DAI);
-    }
+        ZeusStateViewV2.V4Pool[] memory v4pools = new ZeusStateViewV2.V4Pool[](2);
+        v4pools[0] = ZeusStateViewV2.V4Pool({pool: V4_ETH_UNI, tickSpacing: 60});
+        v4pools[1] = ZeusStateViewV2.V4Pool({pool: V4_LINK_USDC, tickSpacing: 60});
 
-    function testgetV3PoolState() public view {
-        ZeusStateView.V3Pool[] memory pools = new ZeusStateView.V3Pool[](1);
-        pools[0] = ZeusStateView.V3Pool({addr: V3_USDC_WETH_MEDIUM, tokenA: USDC, tokenB: WETH, fee: 3000});
+        ZeusStateViewV2.PoolsState memory poolsState = zeusStateView.getPoolsState(v2pools, v3pools, v4pools, STATE_VIEW);
 
-        ZeusStateView.V3PoolData[] memory poolData = zeusStateView.getV3PoolState(pools);
-        assertEq(poolData.length, 1);
-    }
-
-    function testgetV3PoolState2() public view {
-        ZeusStateView.V3Pool[] memory pools = new ZeusStateView.V3Pool[](2);
-        pools[0] = ZeusStateView.V3Pool({addr: V3_USDC_WETH, tokenA: USDC, tokenB: WETH, fee: 500});
-        pools[1] = ZeusStateView.V3Pool({addr: V3_USDT_UNI, tokenA: USDT, tokenB: UNI, fee: 3000});
-
-        ZeusStateView.V3PoolData[] memory poolData = zeusStateView.getV3PoolState(pools);
-        assertEq(poolData.length, 2);
-    }
-
-    function testgetV4PoolState() public view {
-        ZeusStateView.V4Pool[] memory pools = new ZeusStateView.V4Pool[](1);
-        pools[0] = ZeusStateView.V4Pool({pool: ETH_UNI, tickSpacing: 60});
-
-        ZeusStateView.V4PoolData[] memory poolData = zeusStateView.getV4PoolState(pools, STATE_VIEW);
-        assertEq(poolData.length, 1);
+        assertEq(poolsState.v2Reserves.length, 2);
+        assertEq(poolsState.v3PoolsData.length, 2);
+        assertEq(poolsState.v4PoolsData.length, 2);
     }
 }
